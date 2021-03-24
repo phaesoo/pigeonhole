@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package citadel;
+option go_package = "github.com/phaesoo/citadel/gen/go/proto";
+
+import "google/api/annotations.proto";
+import "google/protobuf/struct.proto";
+
+service Pigeonhole {
+  rpc Send(NotificationRequest) returns (NotificationReply){
+    option (google.api.http) = {
+        post: "/v1/notification"
+    };
+  }
+}
+
+message Alert {
+  string title = 1;
+  string body = 2;
+  string subtitle = 3;
+  string action = 4;
+  string actionLocKey = 5;
+  string launchImage = 6;
+  string locKey = 7;
+  string titleLocKey = 8;
+  repeated string locArgs = 9;
+  repeated string titleLocArgs = 10;
+}
+
+message NotificationRequest {
+  repeated string tokens = 1;
+  int32 platform = 2;
+  string message = 3;
+  string title = 4;
+  string topic = 5;
+  string key = 6;
+  int32 badge = 7;
+  string category = 8;
+  Alert alert = 9;
+  string sound = 10;
+  bool contentAvailable = 11;
+  string threadID = 12;
+  bool mutableContent = 13;
+  google.protobuf.Struct data = 14;
+  string image = 15;
+  enum Priority {
+      Normal = 0;
+      High = 1;
+  }
+  Priority priority = 16;
+}
+
+message NotificationReply {
+  bool success = 1;
+  int32 counts = 2;
+}
