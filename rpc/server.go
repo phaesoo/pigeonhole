@@ -2,23 +2,33 @@ package rpc
 
 import (
 	"context"
+	"net"
 	"strings"
 
+	"github.com/phaesoo/pigeonhole/configs"
 	pb "github.com/phaesoo/pigeonhole/gen/go/rpc/proto"
+	"github.com/phaesoo/pigeonhole/internal/logging"
 	"github.com/phaesoo/pigeonhole/models"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 type Server struct {
+	pb.UnimplementedPigeonholeServer
+	config configs.AppConfig
+	logger logging.Logger
 }
 
-func NewServer() *Server {
-	return &Server{}
+func NewServer(config configs.AppConfig, logger logging.Logger) *Server {
+	return &Server{
+		logger: logger,
+	}
 }
 
 // Send implements helloworld.GreeterServer
 func (s *Server) Send(ctx context.Context, in *pb.NotificationRequest) (*pb.NotificationReply, error) {
 	badge := int(in.Badge)
-	notification := pb.PushNotification{
+	notification := models.PushNotification{
 		Platform:         int(in.Platform),
 		Tokens:           in.Tokens,
 		Message:          in.Message,
@@ -70,4 +80,29 @@ func (s *Server) Send(ctx context.Context, in *pb.NotificationRequest) (*pb.Noti
 		Success: true,
 		Counts:  int32(len(notification.Tokens)),
 	}, nil
+}
+
+// RunServer runs pigeonhole gRPC server
+func (s *Server) RunServer(ctx context.Context) error {
+	grpcServer := grpc.NewServer()
+	pb.RegisterPigeonholeServer(grpcServer, s)
+
+	// Register reflection service on gRPC server.
+	reflection.Register(grpcServer)
+
+	lis, err := net.Listen("tcp", ":"+s.config.Address())
+	if err != nil {
+		return err
+	}
+	go func() {
+		select {
+		case <-ctx.Done():
+			grpcServer.GracefulStop() // graceful shutdown
+			s.logger.Info("Shutdown the gRPC server")
+		}
+	}()
+	if err = grpcServer.Serve(lis); err != nil {
+		s.logger.Error(err)
+	}
+	return err
 }
